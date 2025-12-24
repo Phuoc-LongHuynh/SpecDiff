@@ -73,7 +73,7 @@ class SEBlock(nn.Module):
     def forward(self, x):
         return x * self.excitation(self.pool(x))
 
-class SimpleBlock(nn.Module):
+class FSBlock(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
         self.conv1 = nn.Conv2d(in_c, out_c, 3, 1, 1)
@@ -88,7 +88,7 @@ class SimpleBlock(nn.Module):
         h = self.se(h)
         return h
 
-class Block(nn.Module):
+class TCS(nn.Module):
     def __init__(self, in_channels, out_channels, time_emb_dim):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
@@ -130,7 +130,7 @@ class CustomGatedAttention(nn.Module):
         self.v_norms = nn.ModuleList([nn.BatchNorm2d(channels) for _ in range(num_iterations)])
         
         self.bottleneck_blocks = nn.ModuleList([
-            Block(channels, channels, time_emb_dim) for _ in range(num_bottleneck_blocks)
+            TCS(channels, channels, time_emb_dim) for _ in range(num_bottleneck_blocks)
         ])
         self.bottleneck_gate_convs = nn.ModuleList([nn.Conv2d(channels, channels, kernel_size=1) for _ in range(num_iterations)])
         self.sigmoid = nn.Sigmoid()
@@ -173,8 +173,8 @@ class CustomGatedAttention(nn.Module):
             zqk = q_processed * k_processed
 
             h = zqk
-            for block in self.bottleneck_blocks:
-                h = block(h, t_emb)
+            for TCS in self.bottleneck_blocks:
+                h = TCS(h, t_emb)
             
             gate = self.sigmoid(h)
             
@@ -189,11 +189,11 @@ class CustomGatedAttention(nn.Module):
 class ControlEncoder(nn.Module):
     def __init__(self, initial_latent_channels, time_emb_dim=128):
         super().__init__()
-        self.down1 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
-        self.down2 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
-        self.down3 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.down1 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.down2 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.down3 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
         self.pool = nn.MaxPool2d(2)
-        self.bot1 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.bot1 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
 
         self.zt_parser_conv1 = nn.Conv2d(initial_latent_channels, initial_latent_channels, kernel_size=1)
         self.zt_parser_norm1 = nn.BatchNorm2d(initial_latent_channels)
@@ -237,23 +237,23 @@ class ControlEncoder(nn.Module):
 class SimpleUNet(nn.Module):
     def __init__(self, initial_latent_channels, time_emb_dim=128):
         super().__init__()
-        self.down1 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
-        self.down2 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
-        self.down3 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.down1 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.down2 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.down3 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
         self.pool = nn.MaxPool2d(2)
-        self.bot1 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.bot1 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
         
         self.bot_attention = CustomGatedAttention(channels=initial_latent_channels, time_emb_dim=time_emb_dim)
-        self.bot2 = Block(initial_latent_channels, initial_latent_channels, time_emb_dim)
+        self.bot2 = TCS(initial_latent_channels, initial_latent_channels, time_emb_dim)
 
-        self.up_trans1 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 4, 2,1)
-        self.up1 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.up_trans1 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 4, 2, 1)
+        self.up1 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
         
-        self.up_trans2 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 6, 2,2)
-        self.up2 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.up_trans2 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 6, 2, 2)
+        self.up2 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
         
-        self.up_trans3 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 8, 2,3)
-        self.up3 = Block(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
+        self.up_trans3 = nn.ConvTranspose2d(initial_latent_channels, initial_latent_channels, 8, 2, 3)
+        self.up3 = TCS(initial_latent_channels * 2, initial_latent_channels, time_emb_dim)
         
         self.out = nn.Conv2d(initial_latent_channels, initial_latent_channels, 1)
 
@@ -289,7 +289,7 @@ class SimpleUNet(nn.Module):
         
         return self.out(h_up)
 
-class BasicLDM(nn.Module):
+class SpecDiff(nn.Module):
     def __init__(self, in_channels=3, latent_dim_base=32, num_classes=4, time_emb_dim=128):
         super().__init__()
 
@@ -306,11 +306,11 @@ class BasicLDM(nn.Module):
         )
 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.enc_in = SimpleBlock(in_channels, c0)
-        self.enc_block1 = SimpleBlock(c0, c1)
-        self.enc_block2 = SimpleBlock(c1, c2)
-        self.enc_block3 = SimpleBlock(c2, c3)
-        self.enc_block4 = SimpleBlock(c3, c4)
+        self.enc_in = FSBlock(in_channels, c0)
+        self.enc_block1 = FSBlock(c0, c1)
+        self.enc_block2 = FSBlock(c1, c2)
+        self.enc_block3 = FSBlock(c2, c3)
+        self.enc_block4 = FSBlock(c3, c4)
         self.encoder_to_latent_proj = nn.Conv2d(c4, c0, kernel_size=1)
         self.norm_encoder_to_latent = nn.BatchNorm2d(c0)
         self.act_encoder_to_latent = nn.ReLU()
@@ -318,11 +318,11 @@ class BasicLDM(nn.Module):
         self.control_encoder = ControlEncoder(c0, time_emb_dim)
         self.denoiser = SimpleUNet(c0, time_emb_dim)
 
-        self.zt_encoder_down1 = Block(c0, c0, time_emb_dim)
-        self.zt_encoder_down2 = Block(c0, c0, time_emb_dim)
-        self.zt_encoder_down3 = Block(c0, c0, time_emb_dim)
+        self.zt_encoder_down1 = TCS(c0, c0, time_emb_dim)
+        self.zt_encoder_down2 = TCS(c0, c0, time_emb_dim)
+        self.zt_encoder_down3 = TCS(c0, c0, time_emb_dim)
         self.zt_encoder_pool = nn.MaxPool2d(2)
-        self.zt_encoder_bot1 = Block(c0, c0, time_emb_dim)
+        self.zt_encoder_bot1 = TCS(c0, c0, time_emb_dim)
         
         self.final_noise_predictor = nn.Conv2d(c0, c0, kernel_size=1)
 
@@ -523,7 +523,7 @@ def main():
     else:
         print(f"validation doesn't exist")
 
-    model = BasicLDM(in_channels=IN_CHANNELS, latent_dim_base=LATENT_DIM_BASE, num_classes=NUM_CLASSES, 
+    model = SpecDiff(in_channels=IN_CHANNELS, latent_dim_base=LATENT_DIM_BASE, num_classes=NUM_CLASSES, 
                      time_emb_dim=TIME_EMB_DIM).to(device)
     
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
