@@ -1,1 +1,22 @@
+# SpecDiff
+
 The growing demand for spectrum efficiency in next-generation wireless networks, especially in vehicular environments, necessitates effective spectrum sensing (SS) techniques capable of managing the coexistence of technologies like fifth generation new radio (NR) and radar systems. This paper introduces SpecDiff, an innovative framework based on latent diffusion models for spectrogram segmentation, designed to identify and differentiate these coexisting signals in dynamic, noisy environments. SpecDiff leverages a generative diffusion model in a compact latent space, using an attention-based denoising process to enhance segmentation performance under low signal-to-noise ratios and complex channel conditions. The model achieves state-of-the-art performance, with a mean accuracy of 98.68% and mean intersection-over-union (IoU) of 96.30%, effectively identifying the occupied bandwidth in spectrograms. Furthermore, SpecDiff surpasses existing deep learning models in both accuracy and efficiency, offering a promising solution for spectrum sharing in future wireless networks.
+
+<p align="center">
+  <img src="DFSeg-1.png" alt="SpecDiff Framework" width="100%">
+</p>
+
+## Citation
+If you find this work useful for your research, please cite our paper:
+
+```bibtex
+@ARTICLE{huynh2026latent,
+  author={Huynh-The, Thien and Huynh, Phuoc-Long and Phan, Van-Ca and Vu, Thai-Hoc and Benevides da Costa, Daniel},
+  journal={IEEE Wireless Communications Letters}, 
+  title={Latent Diffusion for Spectrum Sensing of Coexisting Radar and Communication Signals}, 
+  year={2026},
+  volume={15},
+  number={},
+  pages={1025-1029},
+  month={Dec.}
+}
